@@ -132,7 +132,6 @@ public class SimpleDatabaseCLI {
         return values.stream().map(String::trim).collect(Collectors.toList());
     }
 
-
     private static void processSelectCommand(SimpleDatabase db, String[] tokens) {
         // Process SELECT command based on different patterns
 
@@ -171,10 +170,17 @@ public class SimpleDatabaseCLI {
             String column1 = tokens[3].substring(0, tokens[3].indexOf(")")); // Extracting column1 name
             String column2 = tokens[4];
             System.out.println(db.selectCountGroupByOrderBy(tableName, column1, column2));
+        } else if (tokens.length >= 5 && tokens[1].equalsIgnoreCase("from") && tokens[3].equalsIgnoreCase("where")) {
+            // SELECT * FROM table_name WHERE column1=value1 AND column2 LIKE value2 OR column3=value3;
+            String tableName = tokens[2];
+            Map<String, String> conditions = parseConditions(tokens, 4);
+            System.out.println(db.selectData(tableName, conditions));
         } else {
-            System.out.println("Invalid syntax. Usage: SELECT ... FROM ...;");
+            System.out.println("Invalid syntax. Usage: SELECT ... FROM ... [WHERE ...];");
         }
     }
+
+
 
     private static void processUpdateCommand(SimpleDatabase db, String[] tokens) {
         if (tokens.length >= 4 && tokens[0].equalsIgnoreCase("update")) {
