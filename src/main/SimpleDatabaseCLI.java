@@ -193,15 +193,15 @@ public class SimpleDatabaseCLI {
                 }
             }
 
-            if (setIndex != -1 && whereIndex != -1) {
+            if (setIndex != -1) {
                 Map<String, String> setValues = parseSetValues(tokens, setIndex + 1, whereIndex - 1);
                 Map<String, String> conditions = parseConditions(tokens, whereIndex + 1, tokens.length - 1);
                 db.updateData(tableName, setValues, conditions);
             } else {
-                System.out.println("Invalid syntax. Usage: UPDATE <table_name> SET <column1=value1, column2=value2, ...> WHERE <condition>;");
+                System.out.println("Invalid syntax. Usage: UPDATE <table_name> SET <column1=value1, column2=value2, ...> [WHERE <condition>];");
             }
         } else {
-            System.out.println("Invalid syntax. Usage: UPDATE <table_name> SET <column1=value1, column2=value2, ...> WHERE <condition>;");
+            System.out.println("Invalid syntax. Usage: UPDATE <table_name> SET <column1=value1, column2=value2, ...> [WHERE <condition>];");
         }
     }
 
@@ -209,14 +209,14 @@ public class SimpleDatabaseCLI {
         if (tokens.length >= 4 && tokens[1].equalsIgnoreCase("from") && tokens[tokens.length - 2].equalsIgnoreCase("where")) {
             // DELETE FROM table_name WHERE condition;
             String tableName = tokens[2];
-            Map<String, String> conditions = parseConditions(tokens, 4, tokens.length - 3); // Corrected
+            Map<String, String> conditions = parseConditions(tokens, tokens.length - 1);
             db.deleteData(tableName, conditions);
         } else if (tokens.length == 3 && tokens[1].equalsIgnoreCase("from")) {
             // DELETE FROM table_name;
             String tableName = tokens[2];
             db.deleteData(tableName, null);
         } else {
-            System.out.println("Invalid syntax. Usage: DELETE FROM <table_name> WHERE <condition>;");
+            System.out.println("Invalid syntax. Usage: DELETE FROM <table_name> [WHERE <condition>];");
         }
     }
 
@@ -249,20 +249,57 @@ public class SimpleDatabaseCLI {
         return setValues;
     }
 
-    private static Map<String, String> parseConditions(String[] tokens, int start, int end) {
-        Map<String, String> conditions = new HashMap<>();
-        StringBuilder currentToken = new StringBuilder();
+    private static Map<String, String> parseConditions(String[] tokens, int startIndex, int... endIndex) {
+        int end;
+        if (endIndex.length > 0) {
+            end = endIndex[0];
+        } else {
+            end = tokens.length;
+        }
 
-        for (int i = start; i <= end; i++) {
-            currentToken.append(tokens[i]);
-            if (i == end || tokens[i].endsWith("AND")) {
-                String[] keyValue = currentToken.toString().split("=");
+        Map<String, String> conditions = new HashMap<>();
+        boolean isAND = true; // Start with AND as the default logical operator
+
+        for (int i = startIndex; i < end; i++) {
+            if (tokens[i].equalsIgnoreCase("AND")) {
+                isAND = true;
+            } else if (tokens[i].equalsIgnoreCase("OR")) {
+                isAND = false;
+            } else if (!tokens[i].equalsIgnoreCase("WHERE")) {
+                String[] keyValue = tokens[i].split("=");
                 if (keyValue.length == 2) {
                     String key = keyValue[0].trim();
-                    String value = keyValue[1].trim().replaceAll("AND$", "").replaceAll(";$", "");
-                    conditions.put(key, value);
+                    String value = keyValue[1].trim();
+
+                    if (isAND) {
+                        conditions.put(key, value);
+                    } else {
+                        // Handle OR condition (combine with the previous condition using OR)
+                        if (conditions.containsKey(key)) {
+                            String existingValue = conditions.get(key);
+                            conditions.put(key, existingValue + " OR " + value);
+                        } else {
+                            conditions.put(key, value);
+                        }
+                    }
+                } else if (keyValue.length == 3 && keyValue[1].equalsIgnoreCase("LIKE")) {
+                    String key = keyValue[0].trim();
+                    String value = keyValue[2].trim();
+
+                    if (isAND) {
+                        conditions.put(key, "LIKE " + value);
+                    } else {
+                        // Handle OR condition for LIKE (combine with the previous condition using OR)
+                        if (conditions.containsKey(key)) {
+                            String existingValue = conditions.get(key);
+                            conditions.put(key, existingValue + " OR LIKE " + value);
+                        } else {
+                            conditions.put(key, "LIKE " + value);
+                        }
+                    }
+                } else {
+                    break;
                 }
-                currentToken = new StringBuilder();
             }
         }
         return conditions;
